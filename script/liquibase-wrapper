@@ -1,0 +1,37 @@
+#!/bin/bash
+# Liquibase 包装脚本 - 读取 .env 环境变量并调用 liquibase CLI
+
+set -e
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+
+# 加载 .env 环境变量
+if [ -f "$PROJECT_DIR/.env" ]; then
+    source "$PROJECT_DIR/.env"
+else
+    echo "❌ 错误：.env 文件不存在"
+    echo "请复制 .env.example 为 .env 并填入配置"
+    exit 1
+fi
+
+# 验证必需的环境变量
+if [ -z "$LIQUIBASE_DATABASE_URL" ] || [ -z "$LIQUIBASE_USERNAME" ] || [ -z "$LIQUIBASE_PASSWORD" ]; then
+    echo "❌ 错误：.env 中缺少必要的配置"
+    echo "请检查以下变量是否已设置："
+    echo "  - LIQUIBASE_DATABASE_URL"
+    echo "  - LIQUIBASE_USERNAME"
+    echo "  - LIQUIBASE_PASSWORD"
+    exit 1
+fi
+
+cd "$PROJECT_DIR"
+
+# 调用 liquibase 命令
+# 将所有参数传递给 liquibase
+liquibase \
+    --url="$LIQUIBASE_DATABASE_URL" \
+    --username="$LIQUIBASE_USERNAME" \
+    --password="$LIQUIBASE_PASSWORD" \
+    --changeLogFile="schema/db.changelog-master.xml" \
+    "$@"

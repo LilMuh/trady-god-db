@@ -1,0 +1,19 @@
+#!/bin/bash
+# 重置数据库 - drop + create
+
+set -e
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+
+echo "===== 重置数据库 ====="
+echo ""
+
+# 执行删除
+"$PROJECT_DIR/script/db-drop" || true
+
+# 执行创建
+"$PROJECT_DIR/script/db-create"
+
+echo ""
+echo "✓ 数据库重置完成"

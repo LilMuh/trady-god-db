@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- 所有数据库变更 changeset 集中在这里 -->
+    <!-- 命名规范：YYYY-MM-DD-HHmmss-描述 -->
+
+    <changeSet id="2026-0306-market data table creation" author="lilfist">
+        <createTable tableName="market_data">
+            <column name="id" type="BIGSERIAL">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="pair" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="interval" type="VARCHAR(5)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="open_time" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="close_time" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="open_price" type="NUMERIC(20, 8)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="high_price" type="NUMERIC(20, 8)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="low_price" type="NUMERIC(20, 8)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="close_price" type="NUMERIC(20, 8)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="volume" type="NUMERIC(28, 8)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="is_completed" type="BOOLEAN" defaultValueBoolean="true"/>
+            <column name="created_at" type="TIMESTAMPTZ" defaultValueComputed="NOW()"/>
+        </createTable>
+
+        <createIndex indexName="idx_market_pair_time_interval" tableName="market_data" unique="true">
+            <column name="pair"/>
+            <column name="interval"/>
+            <column name="open_time" descending="true"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

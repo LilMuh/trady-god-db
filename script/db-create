@@ -1,0 +1,21 @@
+#!/bin/bash
+# 初始化数据库 - 执行所有 changeset
+
+set -e
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+
+# 加载环境变量
+source "$PROJECT_DIR/.env"
+
+cd "$PROJECT_DIR"
+
+echo "===== 初始化数据库 ====="
+echo "Database: $LIQUIBASE_DATABASE_URL"
+echo ""
+
+./script/liquibase-wrapper update
+
+echo ""
+echo "✓ 数据库初始化完成"
