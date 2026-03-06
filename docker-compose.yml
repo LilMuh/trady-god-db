@@ -1,0 +1,40 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16
+    container_name: trady-god-db
+    environment:
+      POSTGRES_USER: ${LIQUIBASE_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${LIQUIBASE_PASSWORD:-your_password}
+      POSTGRES_DB: trady_god_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${LIQUIBASE_USERNAME:-postgres} -d trady_god_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  liquibase:
+    image: liquibase/liquibase:4.27
+    container_name: trady-god-liquibase
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    working_dir: /liquibase/workdir
+    volumes:
+      - ./:/liquibase/workdir:ro
+    command:
+      - --url=jdbc:postgresql://db:5432/trady_god_db
+      - --username=${LIQUIBASE_USERNAME}
+      - --password=${LIQUIBASE_PASSWORD}
+      - --changeLogFile=schema/db.changelog-master.xml
+      - update
+
+volumes:
+  db_data:
