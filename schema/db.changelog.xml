@@ -6,7 +6,7 @@
     http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
 
     <!-- 所有数据库变更 changeset 集中在这里 -->
-    <!-- 命名规范：YYYY-MM-DD-HHmmss-描述 -->
+    <!-- 命名规范：YYYY-MMDD-描述 -->
 
     <changeSet id="2026-0306-market data table creation" author="lilfist">
         <createTable tableName="market_data">
@@ -48,6 +48,46 @@
             <column name="pair"/>
             <column name="interval"/>
             <column name="open_time" descending="true"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="2026-0307-orders-table-creation" author="lilfist">
+        <createTable tableName="orders">
+            <column name="exchange_order_id" type="VARCHAR(100)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="pair" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="side" type="VARCHAR(10)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="price" type="NUMERIC(20, 8)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="amount" type="NUMERIC(20, 8)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <sql>
+            ALTER TABLE orders
+            ADD CONSTRAINT chk_orders_side
+            CHECK (side IN ('BUY', 'SELL'));
+        </sql>
+
+        <sql>
+            ALTER TABLE orders
+            ADD CONSTRAINT chk_orders_status
+            CHECK (status IN ('FILLED', 'CANCELED'));
+        </sql>
+
+        <createIndex indexName="idx_orders_pair_status" tableName="orders">
+            <column name="pair"/>
+            <column name="status"/>
         </createIndex>
     </changeSet>
 
