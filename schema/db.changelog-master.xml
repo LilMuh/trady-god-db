@@ -5,7 +5,7 @@
     xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
     http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
 
-    <!-- 主 changelog 文件：只负责 include 其他 changelog，不直接写 changeset -->
+    <!-- 主 changelog 只引用其他 changelog 文件。不要在这里写 changeset。 -->
     
     <include file="schema/db.changelog.xml"/>
 

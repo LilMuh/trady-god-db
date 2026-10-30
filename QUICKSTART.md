@@ -1,210 +1,103 @@
-# 快速开始指南
+# 快速开始
 
-## 项目结构
+这个仓库管理 `trady_god_db` 的表结构。数据库是 PostgreSQL 16，表结构变更由 Liquibase 执行。
+交易程序 `tradyGod-api` 读写这个数据库。
+
+## 目录
 
 ```
-your-db/
+trady-god-db/
 ├── schema/
-│   ├── db.changelog-master.xml   ← 只做 include，不动
-│   └── db.changelog.xml          ← 所有 changeset 写这里
-├── script/
-│   ├── db-create                 ← 初始化数据库
-│   ├── db-drop                   ← 删库
-│   ├── db-reset                  ← drop + create
-│   ├── db-update                 ← 增量更新
-│   └── liquibase-wrapper         ← 读 .env 调用 liquibase CLI
-├── .env.example                  ← 配置模板（提交到 git）
-├── .gitignore                    ← .env 已加入忽略
-├── liquibase.properties          ← Liquibase 配置文件
-├── liquibase.pro                 ← Liquibase Pro 配置（可选）
-└── QUICKSTART.md                 ← 本文件
+│   ├── db.changelog-master.xml   主 changelog，只引用 db.changelog.xml
+│   └── db.changelog.xml          全部 changeset
+├── script/                       调用本机 liquibase 命令的脚本
+├── docker-compose.yml            启动数据库并执行 changeset
+├── .env.example                  配置模板
+└── liquibase.properties          直接使用 liquibase 命令时的默认配置
 ```
 
-## 1️⃣ 初始化配置
+## 默认连接信息
 
-### 步骤 1：复制配置文件
+| 项目 | 值 |
+|---|---|
+| 主机 | localhost |
+| 端口 | 5435 |
+| 数据库 | trady_god_db |
+| 用户 | tradyUser |
+| 密码 | tradyPassword |
+
+`tradyGod-api/.env` 中的 `DB_HOST`、`DB_PORT`、`DB_NAME`、`DB_USER`、`DB_PASSWORD` 必须和这张表一致。
+
+本机 5432 端口已经有其他 PostgreSQL，所以容器默认映射到 5435。要换端口，在 `.env` 中修改 `DB_HOST_PORT`，同时修改 `LIQUIBASE_DATABASE_URL` 和 `tradyGod-api` 的 `DB_PORT`。
+
+## 方法 1：docker compose（推荐）
+
+1. 创建配置文件：
+
+   ```bash
+   cp .env.example .env
+   ```
+
+2. 启动数据库，执行全部 changeset：
+
+   ```bash
+   docker compose up -d
+   ```
+
+3. 检查 changeset 执行结果：
+
+   ```bash
+   docker compose logs liquibase
+   ```
+
+   日志中有 `Liquibase command 'update' was executed successfully`，表示执行成功。
+
+4. 增加新的 changeset 以后，再执行一次 update：
+
+   ```bash
+   docker compose run --rm liquibase
+   ```
+
+## 方法 2：本机 liquibase 命令
+
+先安装 liquibase 命令行工具，然后：
 
 ```bash
-# 从模板创建 .env 文件
 cp .env.example .env
-```
-
-### 步骤 2：编辑 `.env` 文件
-
-填入你的实际数据库连接信息：
-
-```bash
-LIQUIBASE_DATABASE_URL=jdbc:mysql://localhost:3306/your_database?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
-LIQUIBASE_USERNAME=root
-LIQUIBASE_PASSWORD=your_password
-```
-
-### 步骤 3：使脚本可执行（Linux/macOS）
-
-```bash
-chmod +x script/db-create
-chmod +x script/db-drop
-chmod +x script/db-reset
-chmod +x script/db-update
-chmod +x script/liquibase-wrapper
-```
-
-## 2️⃣ 常见操作
-
-### 初始化数据库
-
-```bash
-./script/db-create
-```
-
-这会执行 `db.changelog.xml` 中的所有 changeset，初始化数据库。
-
-### 增量更新
-
-```bash
+chmod +x script/*
 ./script/db-update
 ```
 
-执行新增的 changeset（之前执行过的不会重复执行）。
+| 脚本 | 作用 |
+|---|---|
+| `script/db-create` | 执行全部 changeset |
+| `script/db-update` | 执行新增的 changeset |
+| `script/db-drop` | 删除全部表。执行前要求确认 |
+| `script/db-reset` | 先删除全部表，再执行全部 changeset |
+| `script/liquibase-wrapper` | 读取 `.env`，把参数传给 liquibase |
 
-### 重置数据库
+警告：`db-drop` 和 `db-reset` 会删除全部数据。
 
-```bash
-./script/db-reset
-```
+## 增加 changeset
 
-删除所有表后重新初始化，等于 `db-drop` + `db-create`。
+1. 在 `schema/db.changelog.xml` 末尾追加一个新的 `<changeSet>`。
+2. id 的格式：`YYYY-MMDD-描述`，例如 `2026-1030-orders-swap-columns`。
+3. 执行 update。
 
-### 删除数据库
+警告：不要修改已经执行过的 changeset。Liquibase 会检查每个 changeset 的校验和，修改后 update 会失败。
 
-```bash
-./script/db-drop
-```
+## 常见问题
 
-删除数据库中的所有表和 Liquibase 元数据表。
-
-## 3️⃣ 编写 Changeset
-
-所有数据库变更都写在 `schema/db.changelog.xml` 文件中。
-
-### 创建表示例
-
-```xml
-<changeSet id="2026-03-06-120000-create-users-table" author="admin">
-    <createTable tableName="users">
-        <column name="id" type="BIGINT" autoIncrement="true">
-            <constraints primaryKey="true" nullable="false"/>
-        </column>
-        <column name="username" type="VARCHAR(255)">
-            <constraints nullable="false" unique="true"/>
-        </column>
-        <column name="email" type="VARCHAR(255)">
-            <constraints nullable="false" unique="true"/>
-        </column>
-        <column name="created_at" type="TIMESTAMP" defaultValueDb="CURRENT_TIMESTAMP"/>
-        <column name="updated_at" type="TIMESTAMP" defaultValueDb="CURRENT_TIMESTAMP"/>
-    </createTable>
-</changeSet>
-```
-
-### 添加列示例
-
-```xml
-<changeSet id="2026-03-06-140000-add-phone-column" author="admin">
-    <addColumn tableName="users">
-        <column name="phone" type="VARCHAR(20)"/>
-    </addColumn>
-</changeSet>
-```
-
-### 创建索引示例
-
-```xml
-<changeSet id="2026-03-06-150000-add-user-email-index" author="admin">
-    <createIndex indexName="idx_user_email" tableName="users">
-        <column name="email"/>
-    </createIndex>
-</changeSet>
-```
-
-## 4️⃣ Changeset 命名规范
-
-### ID 格式
-
-```
-YYYY-MM-DD-HHmmss-描述
-```
-
-**示例：**
-- `2026-03-06-120000-create-users-table` - 创建用户表
-- `2026-03-06-140000-add-email-column` - 添加邮箱列
-- `2026-03-07-100000-create-orders-table` - 创建订单表
-
-### Author 字段
-
-使用开发者名字或团队名称，例如：
-- `admin`
-- `dev-team`
-- `alice`
-
-## 5️⃣ Windows 用户说明
-
-Windows 上无法直接运行 bash 脚本，有以下解决方案：
-
-### 方案 A：使用 WSL 或 Git Bash
-
-如果安装了 WSL 或 Git Bash，可以直接运行脚本：
-
-```bash
-./script/db-create
-```
-
-### 方案 B：直接调用 liquibase 命令
-
-```bash
-# 读取 .env 文件中的变量，然后调用 liquibase
-liquibase --url=jdbc:mysql://localhost:3306/your_database --username=root --password=your_password --changeLogFile=schema/db.changelog-master.xml update
-```
-
-### 方案 C：创建 PowerShell 脚本版本
-
-可以创建 `.ps1` 版本的脚本，类似 Linux shell 脚本的功能。
-
-## 6️⃣ 常见问题
-
-### Q: 如何查看待执行的 SQL？
+**查看将要执行的 SQL，不实际执行：**
 
 ```bash
 ./script/liquibase-wrapper updateSQL
 ```
 
-### Q: 如何回滚最后一个 changeset？
+**回滚最后一个 changeset：**
 
 ```bash
-./script/liquibase-wrapper rollback 1
+./script/liquibase-wrapper rollback-count 1
 ```
 
-### Q: 如何跳过某个 changeset？
-
-在 changeset 中添加 `<rollback />` 标签，或在 changeset 中添加 `<preconditions onFail="MARK_RAN">` 来跳过执行。
-
-### Q: 数据库中的 DATABASECHANGELOG 表是什么？
-
-这是 Liquibase 自动创建的元数据表，用来跟踪已执行的 changeset。不要手动修改它。
-
-### Q: 如何在团队中협作？
-
-1. 每个开发者创建自己的 changeset
-2. 所有 changeset 追加到 `db.changelog.xml`
-3. 提交到 git（但 `.env` 不提交，因为在 `.gitignore` 中）
-4. 团队成员同步 `db.changelog.xml`，然后运行 `./script/db-update`
-
-## 7️⃣ 相关资源
-
-- [Liquibase 官方文档](https://docs.liquibase.com)
-- [XML 格式参考](https://docs.liquibase.com/concepts/about-change-types.html)
-- [Liquibase 命令行工具](https://docs.liquibase.com/tools-integrations/community-supported/liquibase-command-line.html)
-
----
-
-**最后更新：** 2026-03-06
+**DATABASECHANGELOG 表是什么：** Liquibase 用这张表记录已经执行过的 changeset。不要手动修改这张表。

@@ -5,8 +5,9 @@
     xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
     http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
 
-    <!-- 所有数据库变更 changeset 集中在这里 -->
-    <!-- 命名规范：YYYY-MMDD-描述 -->
+    <!-- 所有 changeset 都写在这个文件中。 -->
+    <!-- changeset id 的格式：YYYY-MMDD-描述。 -->
+    <!-- 警告：不要修改已经执行过的 changeset。要改表结构，在文件末尾追加新的 changeset。 -->
 
     <changeSet id="2026-0306-market data table creation" author="lilfist">
         <createTable tableName="market_data">
@@ -89,6 +90,36 @@
             <column name="pair"/>
             <column name="status"/>
         </createIndex>
+    </changeSet>
+
+    <!-- orders 表增加永续合约订单的字段。 -->
+    <!-- 新字段全部允许为空，旧的现货订单记录不受影响。 -->
+    <!-- 对合约订单，amount 是成交张数，price 是成交均价。没有成交时两者都是 0。 -->
+    <changeSet id="2026-1030-orders-swap-columns" author="lilfist">
+        <addColumn tableName="orders">
+            <!-- 持仓方向：long 或 short。 -->
+            <column name="pos_side" type="VARCHAR(10)"/>
+            <!-- 保证金模式，例如 isolated。 -->
+            <column name="td_mode" type="VARCHAR(10)"/>
+            <!-- 订单类型，例如 limit 或 market。 -->
+            <column name="ord_type" type="VARCHAR(20)"/>
+            <!-- 挂单价。市价单为空。 -->
+            <column name="order_price" type="NUMERIC(20, 8)"/>
+            <!-- 下单张数。 -->
+            <column name="order_size" type="NUMERIC(20, 8)"/>
+            <!-- 杠杆倍数。 -->
+            <column name="lever" type="NUMERIC(10, 2)"/>
+            <!-- 手续费。负数表示支付。 -->
+            <column name="fee" type="NUMERIC(20, 8)"/>
+            <!-- 平仓收益。 -->
+            <column name="pnl" type="NUMERIC(20, 8)"/>
+            <!-- 触发这个平仓单的止盈止损单编号。开仓单为空。 -->
+            <column name="algo_id" type="VARCHAR(100)"/>
+            <!-- 交易所下单时间，单位毫秒。 -->
+            <column name="order_time" type="BIGINT"/>
+            <!-- 写入数据库的时间。 -->
+            <column name="created_at" type="TIMESTAMPTZ" defaultValueComputed="NOW()"/>
+        </addColumn>
     </changeSet>
 
 </databaseChangeLog>

@@ -1,12 +1,12 @@
 #!/bin/bash
-# 初始化数据库 - 执行所有 changeset
+# 执行全部 changeset，创建表结构。
 
 set -e
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
-# 加载环境变量
+# 读取 .env 中的连接信息。
 source "$PROJECT_DIR/.env"
 
 cd "$PROJECT_DIR"

@@ -1,12 +1,12 @@
 #!/bin/bash
-# 增量更新 - 执行新增的 changeset
+# 执行还没有执行过的 changeset。
 
 set -e
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
-# 加载环境变量
+# 读取 .env 中的连接信息。
 source "$PROJECT_DIR/.env"
 
 cd "$PROJECT_DIR"

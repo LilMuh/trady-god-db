@@ -1,38 +1,39 @@
-version: "3.9"
+# 启动 PostgreSQL，然后用 Liquibase 执行全部 changeset。
+# 用法：cp .env.example .env，然后执行 docker compose up -d。
+# 本机端口默认是 5435。要修改，在 .env 中设置 DB_HOST_PORT。
 
 services:
   db:
     image: postgres:16
     container_name: trady-god-db
     environment:
-      POSTGRES_USER: ${LIQUIBASE_USERNAME:-postgres}
-      POSTGRES_PASSWORD: ${LIQUIBASE_PASSWORD:-your_password}
+      POSTGRES_USER: ${LIQUIBASE_USERNAME:-tradyUser}
+      POSTGRES_PASSWORD: ${LIQUIBASE_PASSWORD:-tradyPassword}
       POSTGRES_DB: trady_god_db
     ports:
-      - "5432:5432"
+      - "${DB_HOST_PORT:-5435}:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${LIQUIBASE_USERNAME:-postgres} -d trady_god_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${LIQUIBASE_USERNAME:-tradyUser} -d trady_god_db"]
       interval: 5s
       timeout: 5s
       retries: 10
 
+  # 数据库就绪后执行一次 update，然后退出。
   liquibase:
     image: liquibase/liquibase:4.27
     container_name: trady-god-liquibase
     depends_on:
       db:
         condition: service_healthy
-    env_file:
-      - .env
     working_dir: /liquibase/workdir
     volumes:
       - ./:/liquibase/workdir:ro
     command:
       - --url=jdbc:postgresql://db:5432/trady_god_db
-      - --username=${LIQUIBASE_USERNAME}
-      - --password=${LIQUIBASE_PASSWORD}
+      - --username=${LIQUIBASE_USERNAME:-tradyUser}
+      - --password=${LIQUIBASE_PASSWORD:-tradyPassword}
       - --changeLogFile=schema/db.changelog-master.xml
       - update
 
