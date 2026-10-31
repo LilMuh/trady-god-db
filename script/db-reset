@@ -1,5 +1,6 @@
 #!/bin/bash
-# 重置数据库 - drop + create
+# 先删除全部表，再执行全部 changeset。
+# 警告：这个操作删除全部数据。
 
 set -e
 
@@ -9,10 +10,10 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 echo "===== 重置数据库 ====="
 echo ""
 
-# 执行删除
+# 删除全部表。用户取消时继续执行下一步。
 "$PROJECT_DIR/script/db-drop" || true
 
-# 执行创建
+# 执行全部 changeset。
 "$PROJECT_DIR/script/db-create"
 
 echo ""
