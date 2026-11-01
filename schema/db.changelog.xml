@@ -261,4 +261,107 @@
         </createIndex>
     </changeSet>
 
+    <!-- trades 表增加分批平仓、移动止损、实际风险金额和 MFE 的列。 -->
+    <!-- 新增 trade_exits 表：一行是一次平仓。不分批的交易只有一行。 -->
+    <!-- 旧的行不受影响：新列全部允许为空。 -->
+    <changeSet id="2026-1101-trades-partial-exits" author="lilfist">
+        <addColumn tableName="trades">
+            <!-- 止盈方式：leg_end、fixed_rr 或 partial_trail。 -->
+            <column name="take_profit_mode" type="VARCHAR(20)"/>
+            <!-- TP1 价格，即第一个止盈价。不分批时为空。 -->
+            <column name="first_target_price" type="NUMERIC(20, 8)"/>
+            <!-- TP1 张数。不分批时为空。 -->
+            <column name="first_target_contracts" type="NUMERIC(20, 8)"/>
+            <!-- 当前止损价。stop_loss_price 保留初始止损价。 -->
+            <column name="current_stop_loss_price" type="NUMERIC(20, 8)"/>
+            <!-- 实际风险金额，单位 USDT。 -->
+            <column name="risk_amount" type="NUMERIC(20, 8)"/>
+            <!-- MFE：持仓期间价格最有利时达到多少 R。 -->
+            <column name="max_favorable_r" type="NUMERIC(20, 8)"/>
+        </addColumn>
+
+        <!-- partial_trail 的剩余仓位没有止盈价，所以 take_profit_price 允许为空。 -->
+        <dropNotNullConstraint tableName="trades" columnName="take_profit_price" columnDataType="NUMERIC(20, 8)"/>
+
+        <!-- cancel_reason 增加 STRUCTURE_BREAK（挂单成交前出现了反向的结构突破）。 -->
+        <sql>
+            ALTER TABLE trades
+            DROP CONSTRAINT chk_trades_cancel_reason;
+        </sql>
+
+        <sql>
+            ALTER TABLE trades
+            ADD CONSTRAINT chk_trades_cancel_reason
+            CHECK (cancel_reason IS NULL OR cancel_reason IN ('EXPIRED', 'REPLACED', 'STRUCTURE_BREAK', 'OTHER'));
+        </sql>
+
+        <!-- close_reason 增加 BREAKEVEN_STOP（保本止损）和 TRAILING_STOP（移动止损）。 -->
+        <!-- 分批平仓时，close_reason 是最后一次平仓的原因。 -->
+        <sql>
+            ALTER TABLE trades
+            DROP CONSTRAINT chk_trades_close_reason;
+        </sql>
+
+        <sql>
+            ALTER TABLE trades
+            ADD CONSTRAINT chk_trades_close_reason
+            CHECK (close_reason IS NULL OR close_reason IN ('TAKE_PROFIT', 'STOP_LOSS', 'BREAKEVEN_STOP', 'TRAILING_STOP', 'OTHER'));
+        </sql>
+
+        <sql>
+            ALTER TABLE trades
+            ADD CONSTRAINT chk_trades_take_profit_mode
+            CHECK (take_profit_mode IS NULL OR take_profit_mode IN ('leg_end', 'fixed_rr', 'partial_trail'));
+        </sql>
+
+        <createTable tableName="trade_exits">
+            <!-- 主键。 -->
+            <column name="id" type="BIGSERIAL">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <!-- 所属的交易，指向 trades.id。 -->
+            <column name="trade_id" type="BIGINT">
+                <constraints nullable="false"
+                             foreignKeyName="fk_trade_exits_trade_id"
+                             references="trades(id)"/>
+            </column>
+            <!-- 平仓时间，单位毫秒。 -->
+            <column name="exit_time" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <!-- 平仓均价。 -->
+            <column name="exit_price" type="NUMERIC(20, 8)">
+                <constraints nullable="false"/>
+            </column>
+            <!-- 平仓张数。 -->
+            <column name="contracts" type="NUMERIC(20, 8)">
+                <constraints nullable="false"/>
+            </column>
+            <!-- 平仓原因：TAKE_PROFIT、STOP_LOSS、BREAKEVEN_STOP、TRAILING_STOP 或 OTHER。 -->
+            <column name="reason" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <!-- 手续费。正数表示支付。 -->
+            <column name="fee" type="NUMERIC(20, 8)">
+                <constraints nullable="false"/>
+            </column>
+            <!-- 这次平仓的盈亏：价差盈亏减手续费。 -->
+            <column name="pnl" type="NUMERIC(20, 8)">
+                <constraints nullable="false"/>
+            </column>
+            <!-- 写入数据库的时间。 -->
+            <column name="created_at" type="TIMESTAMPTZ" defaultValueComputed="NOW()"/>
+        </createTable>
+
+        <sql>
+            ALTER TABLE trade_exits
+            ADD CONSTRAINT chk_trade_exits_reason
+            CHECK (reason IN ('TAKE_PROFIT', 'STOP_LOSS', 'BREAKEVEN_STOP', 'TRAILING_STOP', 'OTHER'));
+        </sql>
+
+        <createIndex indexName="idx_trade_exits_trade_id" tableName="trade_exits">
+            <column name="trade_id"/>
+        </createIndex>
+    </changeSet>
+
 </databaseChangeLog>
