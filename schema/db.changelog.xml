@@ -122,4 +122,143 @@
         </addColumn>
     </changeSet>
 
+    <!-- 新增交易记录表 trades。 -->
+    <!-- 一行是一笔交易：从开仓挂单开始，到撤单或平仓结束。 -->
+    <!-- 实盘写这个表。回测不写这个表，只用相同的字段。 -->
+    <changeSet id="2026-1031-trades-table-creation" author="lilfist">
+        <createTable tableName="trades">
+            <!-- 主键。 -->
+            <column name="id" type="BIGSERIAL">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <!-- 交易环境：demo（模拟盘）或 live（实盘）。取自 OKX_ENV。 -->
+            <column name="environment" type="VARCHAR(10)">
+                <constraints nullable="false"/>
+            </column>
+            <!-- 交易对，例如 BTC-USDT-SWAP。 -->
+            <column name="pair" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <!-- K 线周期，例如 15m。 -->
+            <column name="interval" type="VARCHAR(5)">
+                <constraints nullable="false"/>
+            </column>
+            <!-- 策略名称。 -->
+            <column name="strategy" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+            <!-- 持仓方向：long 或 short。 -->
+            <column name="direction" type="VARCHAR(10)">
+                <constraints nullable="false"/>
+            </column>
+            <!-- 信号 K 线的开盘时间，单位毫秒。 -->
+            <column name="signal_time" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <!-- 信号名称，例如"大阳线"。 -->
+            <column name="signal_name" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+            <!-- 信号的附加说明。可以为空。 -->
+            <column name="signal_note" type="VARCHAR(200)"/>
+            <!-- 挂单价。这个值已经取整。 -->
+            <column name="entry_price" type="NUMERIC(20, 8)">
+                <constraints nullable="false"/>
+            </column>
+            <!-- 止损价。这个值已经取整。 -->
+            <column name="stop_loss_price" type="NUMERIC(20, 8)">
+                <constraints nullable="false"/>
+            </column>
+            <!-- 止盈价。这个值已经取整。 -->
+            <column name="take_profit_price" type="NUMERIC(20, 8)">
+                <constraints nullable="false"/>
+            </column>
+            <!-- 下单张数。 -->
+            <column name="contracts" type="NUMERIC(20, 8)">
+                <constraints nullable="false"/>
+            </column>
+            <!-- 开仓挂单的订单号。每个订单号只能出现一次。 -->
+            <column name="entry_order_id" type="VARCHAR(100)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <!-- 交易状态：PENDING、CANCELED、OPEN 或 CLOSED。 -->
+            <column name="status" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <!-- 撤单原因：EXPIRED（没有成交）、REPLACED（有新信号）或 OTHER。 -->
+            <!-- OPEN 和 CLOSED 的行也可以有值，表示部分成交后撤掉了剩余部分。 -->
+            <column name="cancel_reason" type="VARCHAR(20)"/>
+            <!-- 成交时间，单位毫秒。 -->
+            <column name="open_time" type="BIGINT"/>
+            <!-- 成交均价。 -->
+            <column name="open_price" type="NUMERIC(20, 8)"/>
+            <!-- 成交张数。 -->
+            <column name="filled_contracts" type="NUMERIC(20, 8)"/>
+            <!-- 平仓时间，单位毫秒。 -->
+            <column name="close_time" type="BIGINT"/>
+            <!-- 平仓均价。 -->
+            <column name="close_price" type="NUMERIC(20, 8)"/>
+            <!-- 平仓原因：TAKE_PROFIT、STOP_LOSS 或 OTHER。 -->
+            <column name="close_reason" type="VARCHAR(20)"/>
+            <!-- 开仓手续费。正数表示支付。 -->
+            <column name="open_fee" type="NUMERIC(20, 8)"/>
+            <!-- 平仓手续费。正数表示支付。 -->
+            <column name="close_fee" type="NUMERIC(20, 8)"/>
+            <!-- 持仓期间的资金费合计。正数表示支付。回测的值是 0。 -->
+            <column name="funding_fee" type="NUMERIC(20, 8)" defaultValueNumeric="0"/>
+            <!-- 盈亏，已经扣除手续费和资金费。 -->
+            <!-- pnl = 价差盈亏 - open_fee - close_fee - funding_fee。 -->
+            <column name="pnl" type="NUMERIC(20, 8)"/>
+            <!-- 同一根 K 线碰到止盈价和止损价时为 true，这笔交易按止损计算。只有回测会是 true。 -->
+            <column name="same_candle_stop_loss" type="BOOLEAN" defaultValueBoolean="false"/>
+            <!-- 写入数据库的时间。 -->
+            <column name="created_at" type="TIMESTAMPTZ" defaultValueComputed="NOW()"/>
+            <!-- 最后更新的时间。 -->
+            <column name="updated_at" type="TIMESTAMPTZ" defaultValueComputed="NOW()"/>
+        </createTable>
+
+        <sql>
+            ALTER TABLE trades
+            ADD CONSTRAINT chk_trades_environment
+            CHECK (environment IN ('demo', 'live'));
+        </sql>
+
+        <sql>
+            ALTER TABLE trades
+            ADD CONSTRAINT chk_trades_direction
+            CHECK (direction IN ('long', 'short'));
+        </sql>
+
+        <sql>
+            ALTER TABLE trades
+            ADD CONSTRAINT chk_trades_status
+            CHECK (status IN ('PENDING', 'CANCELED', 'OPEN', 'CLOSED'));
+        </sql>
+
+        <sql>
+            ALTER TABLE trades
+            ADD CONSTRAINT chk_trades_cancel_reason
+            CHECK (cancel_reason IS NULL OR cancel_reason IN ('EXPIRED', 'REPLACED', 'OTHER'));
+        </sql>
+
+        <sql>
+            ALTER TABLE trades
+            ADD CONSTRAINT chk_trades_close_reason
+            CHECK (close_reason IS NULL OR close_reason IN ('TAKE_PROFIT', 'STOP_LOSS', 'OTHER'));
+        </sql>
+
+        <!-- status 是 CANCELED 时，cancel_reason 不能为空。 -->
+        <sql>
+            ALTER TABLE trades
+            ADD CONSTRAINT chk_trades_canceled_has_reason
+            CHECK (status &lt;&gt; 'CANCELED' OR cancel_reason IS NOT NULL);
+        </sql>
+
+        <createIndex indexName="idx_trades_environment_pair_status" tableName="trades">
+            <column name="environment"/>
+            <column name="pair"/>
+            <column name="status"/>
+        </createIndex>
+    </changeSet>
+
 </databaseChangeLog>
