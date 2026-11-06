@@ -16,6 +16,18 @@ trady-god-db/
 └── liquibase.properties          直接使用 liquibase 命令时的默认配置
 ```
 
+## 表
+
+| 表 | 内容 |
+|---|---|
+| `market_data` | K 线 |
+| `orders` | 订单 |
+| `trades` | 交易记录。一行是一笔交易 |
+| `trade_exits` | 平仓记录。一行是一次平仓 |
+| `trend_runs` | 日线趋势跟踪的运行记录。一行是一次调仓运行 |
+| `trend_orders` | 日线趋势跟踪的订单。一行是一笔订单 |
+| `trend_halts` | 日线趋势跟踪的停止状态。一行是一次停止 |
+
 ## 默认连接信息
 
 | 项目 | 值 |

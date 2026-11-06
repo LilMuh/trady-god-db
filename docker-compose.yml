@@ -6,6 +6,9 @@ services:
   db:
     image: postgres:16
     container_name: trady-god-db
+    # 容器退出或 Docker 重新启动后，Docker 自动启动这个容器。
+    # 用 docker compose stop 停止后，Docker 不自动启动它。
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${LIQUIBASE_USERNAME:-tradyUser}
       POSTGRES_PASSWORD: ${LIQUIBASE_PASSWORD:-tradyPassword}
