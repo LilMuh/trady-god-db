@@ -364,4 +364,152 @@
         </createIndex>
     </changeSet>
 
+    <!-- 新增日线趋势跟踪的三张表。交易品种是 OKX 现货。 -->
+    <!-- trend_runs：一行是一次调仓运行。 -->
+    <!-- trend_orders：一行是一笔订单。 -->
+    <!-- trend_halts：一行是一次停止。 -->
+    <changeSet id="2026-1107-trend-tables" author="lilfist">
+        <createTable tableName="trend_runs">
+            <!-- 主键。 -->
+            <column name="id" type="BIGSERIAL">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <!-- 交易环境：demo（模拟盘）或 live（实盘）。取自 OKX_ENV。 -->
+            <column name="environment" type="VARCHAR(10)">
+                <constraints nullable="false"/>
+            </column>
+            <!-- 这次运行处理的日线的开盘时间，单位毫秒。和 market_data.open_time 相同。 -->
+            <column name="candle_time" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <!-- 运行开始的时间。 -->
+            <column name="started_at" type="TIMESTAMPTZ" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+            <!-- 运行结束的时间。运行中为空。 -->
+            <column name="finished_at" type="TIMESTAMPTZ"/>
+            <!-- 运行状态：RUNNING、SUCCESS、SKIPPED、FAILED 或 HALTED。 -->
+            <column name="status" type="VARCHAR(10)">
+                <constraints nullable="false"/>
+            </column>
+            <!-- 调仓前的净值，单位 USDT。 -->
+            <column name="equity_before" type="NUMERIC(20, 8)"/>
+            <!-- 调仓后的净值，单位 USDT。 -->
+            <column name="equity_after" type="NUMERIC(20, 8)"/>
+            <!-- 每个币的仓位、币数量和最新价。键是币名，例如 BTC。 -->
+            <column name="weights" type="JSONB"/>
+            <!-- 失败原因。没有失败时为空。 -->
+            <column name="error_message" type="TEXT"/>
+            <!-- 写入数据库的时间。 -->
+            <column name="created_at" type="TIMESTAMPTZ" defaultValueComputed="NOW()"/>
+        </createTable>
+
+        <sql>
+            ALTER TABLE trend_runs
+            ADD CONSTRAINT chk_trend_runs_status
+            CHECK (status IN ('RUNNING','SUCCESS','SKIPPED','FAILED','HALTED'));
+        </sql>
+
+        <!-- 同一个环境、同一根日线，只能有一行状态不是 FAILED。 -->
+        <!-- 这个索引防止两个进程调仓同一根日线。FAILED 的行可以有多行，用来重试。 -->
+        <sql>
+            CREATE UNIQUE INDEX uq_trend_runs_active ON trend_runs (environment, candle_time)
+            WHERE status IN ('RUNNING','SUCCESS','SKIPPED','HALTED');
+        </sql>
+
+        <createIndex indexName="idx_trend_runs_environment_candle_time" tableName="trend_runs">
+            <column name="environment"/>
+            <column name="candle_time"/>
+        </createIndex>
+
+        <createTable tableName="trend_orders">
+            <!-- 主键。 -->
+            <column name="id" type="BIGSERIAL">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <!-- 所属的运行，指向 trend_runs.id。 -->
+            <column name="run_id" type="BIGINT">
+                <constraints nullable="false"
+                             foreignKeyName="fk_trend_orders_run_id"
+                             references="trend_runs(id)"/>
+            </column>
+            <!-- 交易对，例如 BTC-USDT。 -->
+            <column name="pair" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <!-- 买卖方向：buy 或 sell。 -->
+            <column name="side" type="VARCHAR(4)">
+                <constraints nullable="false"/>
+            </column>
+            <!-- 下单数量。买入是 USDT 金额，卖出是币的数量。 -->
+            <column name="order_amount" type="NUMERIC(20, 8)">
+                <constraints nullable="false"/>
+            </column>
+            <!-- order_amount 的币名：买入是 USDT，卖出是交易的币，例如 BTC。 -->
+            <column name="amount_currency" type="VARCHAR(10)">
+                <constraints nullable="false"/>
+            </column>
+            <!-- 下单时发给 OKX 的客户订单号。每个订单号只能出现一次。 -->
+            <column name="client_order_id" type="VARCHAR(32)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <!-- OKX 返回的订单号。下单成功前为空。 -->
+            <column name="exchange_order_id" type="VARCHAR(32)"/>
+            <!-- 下单前读到的最新价。1 周检查用它计算滑点。 -->
+            <column name="reference_price" type="NUMERIC(20, 8)">
+                <constraints nullable="false"/>
+            </column>
+            <!-- 成交的币数量。 -->
+            <column name="filled_quantity" type="NUMERIC(20, 8)"/>
+            <!-- 成交均价。 -->
+            <column name="average_price" type="NUMERIC(20, 8)"/>
+            <!-- 手续费。正数表示支付。 -->
+            <column name="fee" type="NUMERIC(20, 8)"/>
+            <!-- 手续费的币名，例如 USDT 或 BTC。 -->
+            <column name="fee_currency" type="VARCHAR(10)"/>
+            <!-- 订单状态：NEW、FILLED、FAILED，或者 OKX 返回的 state 原样。 -->
+            <column name="status" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <!-- 写入数据库的时间。 -->
+            <column name="created_at" type="TIMESTAMPTZ" defaultValueComputed="NOW()"/>
+        </createTable>
+
+        <sql>
+            ALTER TABLE trend_orders
+            ADD CONSTRAINT chk_trend_orders_side
+            CHECK (side IN ('buy','sell'));
+        </sql>
+
+        <createIndex indexName="idx_trend_orders_run_id" tableName="trend_orders">
+            <column name="run_id"/>
+        </createIndex>
+
+        <createTable tableName="trend_halts">
+            <!-- 主键。 -->
+            <column name="id" type="BIGSERIAL">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <!-- 交易环境：demo（模拟盘）或 live（实盘）。取自 OKX_ENV。 -->
+            <column name="environment" type="VARCHAR(10)">
+                <constraints nullable="false"/>
+            </column>
+            <!-- 停止的原因。 -->
+            <column name="reason" type="TEXT">
+                <constraints nullable="false"/>
+            </column>
+            <!-- 停止开始的时间。 -->
+            <column name="halted_at" type="TIMESTAMPTZ" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+            <!-- 解除停止的时间。为空表示还没解除。 -->
+            <column name="cleared_at" type="TIMESTAMPTZ"/>
+        </createTable>
+
+        <!-- 每个环境最多只有一行未解除的停止状态。 -->
+        <sql>
+            CREATE UNIQUE INDEX uq_trend_halts_active ON trend_halts (environment) WHERE cleared_at IS NULL;
+        </sql>
+    </changeSet>
+
 </databaseChangeLog>
